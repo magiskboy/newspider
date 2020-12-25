@@ -1,0 +1,9 @@
+httpx
+rq
+starlette
+uvicorn
+jinja2
+beautifulsoup4
+motor
+aiofiles
+python-slugify

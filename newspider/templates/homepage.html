@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block main %}
+
+<div id="search">
+  <form action="/search" method="GET">
+    <input type="text" name="keyword">
+    <button type="submit">Search</button>
+  </form>
+</div>
+
+
+<div id="list__news">
+  <ul id="post_link_container">
+    {% for post in posts %}
+    <li><a href="/posts/{{ post['slug'] }}" target="_blank">{{ post['title'] }}</a></li>
+    {% endfor %}
+  </ul>
+  <button onclick="loadMore(10)">Load more</button>
+</div>
+
+{% endblock %}

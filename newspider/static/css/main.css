@@ -1,0 +1,32 @@
+ul {
+  list-style: none;
+}
+
+.container {
+  width: 50%;
+  margin: 0 auto;
+}
+
+#list__news {
+  text-align: center;
+}
+
+#post_link_container li {
+  margin: 10px 0;
+}
+
+figure {
+  width: 70%;
+  margin: 0 auto;
+}
+
+figure video, figure img {
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+figcaption {
+  color: gray;
+  text-align: center;
+}
