@@ -2,10 +2,18 @@ import asyncio
 from .spider import create_spider
 from . import setting
 
+SECOND = 1
+MINUTE = 60 * SECOND
+HOUR = 60 * MINUTE
+DAY = 24 * HOUR
+
 default_config = {
     'dantri': {
-        'delay': 60 * 60 * 5,
-    }
+        'delay': HOUR,
+    },
+    'vnexpress': {
+        'delay': HOUR,
+    },
 }
 
 class Runner:

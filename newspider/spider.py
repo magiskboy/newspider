@@ -22,7 +22,6 @@ class SpiderBase:
     ROOT: str
 
     def __init__(self, mongo_uri):
-        logger.info('DantriSpider is created')
         self.page_success = 0
         self.mongo_client = motor.motor_asyncio.AsyncIOMotorClient(
             mongo_uri,
@@ -62,6 +61,10 @@ class SpiderBase:
 class DantriSpider(SpiderBase):
     ROOT = 'https://dantri.com.vn'
 
+    def __init__(self, mongo_uri):
+        super().__init__(mongo_uri)
+        logger.info('DantriSpider is created')
+
     async def get_list_post(self) -> str:
         class_item = '.news-item__title'
 
@@ -88,23 +91,33 @@ class DantriSpider(SpiderBase):
 
     def get_title_from_soup(self, soup):
         title_node = soup.select_one('.dt-news__title')
-        return title_node.get_text().strip()
+        if title_node:
+            title = title_node.get_text()
+            if title:
+                return title.strip()
+            return ''
+        return ''
 
     def get_breadcrumb_from_soup(self, soup):
-        nodes = soup.select_one('.dt-breadcrumb').findChildren('a', recursive=True)
-        return list(map(lambda x: x.get_text(), nodes))
+        nodes = soup.select('.dt-breadcrumb a')
+        if nodes:
+            return list(map(lambda x: x.get_text(), nodes))
+        return []
 
     def get_tags_from_soup(self, soup):
-        nodes = soup.select_one('.dt-news__tag-list').findChildren('a', recursive=True)
-        return list(map(lambda x: x.get_text(), nodes))
+        nodes = soup.select('.dt-news__tag-list .dt-news__tag a')
+        if nodes:
+            return list(map(lambda x: x.get_text(), nodes))
+        return []
 
     def get_date_from_soup(self, soup):
         dt_node = soup.select_one('.dt-news__time')
-        dt_text = dt_node.get_text()
-        dt_text = dt_text.split(',')
-        if len(dt_text) > 1:
-            dt_text = dt_text[1].strip()
-            return datetime.strptime(dt_text, '%d/%m/%Y - %H:%M')
+        if dt_node:
+            dt_text = dt_node.get_text()
+            dt_text = dt_text.split(',')
+            if len(dt_text) > 1:
+                dt_text = dt_text[1].strip()
+                return datetime.strptime(dt_text, '%d/%m/%Y - %H:%M')
 
     def get_content_from_soup(self, soup):
         content_node = soup.select_one('.dt-news__content')
@@ -117,7 +130,7 @@ class DantriSpider(SpiderBase):
             resp = await c.get(url)
 
             if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, 'html.parser')
+                soup = BeautifulSoup(resp.content, 'html.parser')
 
                 title = self.get_title_from_soup(soup)
                 page = {
@@ -152,7 +165,111 @@ class DantriSpider(SpiderBase):
                 logger.error(exc.msg)
 
 
+class VnxpressSpider(SpiderBase):
+    ROOT = 'https://vnexpress.net'
+
+    def __init__(self, mongo_uri):
+        logger.info('VnexpressSpider is created')
+        super().__init__(mongo_uri)
+
+    async def get_list_post(self) -> T.Dict[str, str]:
+        class_item = '.item-news .title-news a'
+
+        async with httpx.AsyncClient() as c:
+            resp = await c.get(self.ROOT)       #pylint: disable=E1101
+
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            items = soup.select(class_item)
+
+            for item in items:
+                title = item.get('title')
+                c = await self.db.posts.count_documents({'title': title})
+                if c:
+                    continue
+
+                path = item.get('href')
+                if 'video.vnexpress.net' in path:
+                    continue
+
+                yield path
+
+    def get_title_from_soup(self, soup):
+        title_node = soup.select_one('.title-detail')
+        if title_node:
+            return title_node.get_text().strip()
+        return ''
+
+    def get_breadcrumb_from_soup(self, soup):
+        nodes = soup.select('ul.breadcrumb li a')
+        return list(map(lambda x: x.get('title'), nodes))
+
+    def get_tags_from_soup(self, soup):
+        return []
+
+    def get_date_from_soup(self, soup):
+        dt_node = soup.select_one('.header-content .date')
+        if dt_node:
+            dt_text = dt_node.get_text()
+            dt_text = dt_text.split(',', 1)[1]
+            dt_text = dt_text.split('(')[0].strip()
+            if dt_text:
+                return datetime.strptime(dt_text, '%d/%m/%Y, %H:%M')
+
+    def get_content_from_soup(self, soup):
+        content_node = soup.select_one('article.fck_detail')
+        if content_node:
+            data = ''.join(str(x) for x in content_node.contents).strip()
+            data = data.replace('data-src', 'src')
+            return data
+        return ''
+
+    async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
+        page = {}
+        url = path      #pylint: disable=E1101
+        async with httpx.AsyncClient() as c:
+            resp = await c.get(url)
+
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+
+                title = self.get_title_from_soup(soup)
+                page = {
+                    'title': title,
+                    'slug': slugify(title),
+                    'path': path,
+                    'categories': self.get_breadcrumb_from_soup(soup),
+                    'date': self.get_date_from_soup(soup),
+                    'content': self.get_content_from_soup(soup),
+                    'tags': self.get_tags_from_soup(soup),
+                    'source': 'VnExpress',
+                }
+            return page
+
+    async def fetch_and_save(self, path: str):
+        page = await self.fetch_page(path)
+        await self.save_to_storage(page)
+
+    async def run(self):
+        fs = []
+        async for path in self.get_list_post():
+            f = asyncio.create_task(self.fetch_and_save(path))
+            fs.append(f)
+
+        await asyncio.wait(fs)
+        self.page_success = 0
+        for f in fs:
+            exc = f.exception()
+            if exc is None:
+                self.page_success += 1
+            else:
+                logger.error(exc)
+                raise exc
+
+
+
 def create_spider(name, *args, **kwargs):
     return {
         'dantri': DantriSpider(*args, **kwargs),
+        'vnexpress': VnxpressSpider(*args, **kwargs),
     }.get(name)
