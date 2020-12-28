@@ -19,6 +19,6 @@ ADD . .
 
 EXPOSE 8000
 
-ENTRYPOINT ./entry-point.sh
+ENTRYPOINT ./docker-entrypoint.sh
 
 CMD /bin/sh
