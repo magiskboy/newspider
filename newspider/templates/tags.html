@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block main %}
+
+<h2>{{ tag }}</h2>
+
+<div id="list__news">
+  {% if posts %}
+    <ul id="post_link_container">
+      {% for post in posts %}
+      <li><a href="/posts/{{ post['slug'] }}" target="_blank">{{ post['title'] }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <h3>
+      Result not found
+    </h3>
+  {% endif %}
+  <div class="nav">
+    {% if prev_page >= 0 %}
+      <a href="/tags?tag={{tag}}&next_page={{prev_page}}">
+        Previous
+      </a>
+    {% endif %}
+    <span>{{ page }}</span>
+    {% if next_page >= 0 %}
+      <a href="/tags?tag={{tag}}&next_page={{next_page}}">Next</a>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

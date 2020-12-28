@@ -6,6 +6,9 @@ from . import views, setting, apis
 view_routing = [
     Route('/', endpoint=views.homepage),
     Route('/posts/{slug:str}', views.post),
+    Route('/search', views.search),
+    Route('/categories', views.categories),
+    Route('/tags', views.tags),
 ]
 
 

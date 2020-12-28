@@ -1,27 +1,15 @@
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from .storage import get_db
+from .storage import get_posts
+from . import utils
 
 
 async def get_post_links(request: Request):
-    db = get_db()
-    offset = request.query_params.get('offset')
-    if offset:
-        offset = int(offset)
-    else:
-        offset = 0
+    page = request.query_params.get('page')
+    page = utils.safe_cast(page, int, 0)
 
-    limit = request.query_params.get('limit')
-    if limit:
-        limit = int(limit)
-    else:
-        limit = 10
+    page_size = request.query_params.get('page_size')
+    page_size = utils.safe_cast(page_size, int, 10)
 
-    posts = []
-    async for post in db.posts.find().sort('date').skip(offset).limit(limit):
-        posts.append({
-            'slug': post['slug'],
-            'title': post['title'],
-        })
-
+    posts = await get_posts(None, page, page_size, fields=['title', 'slug', 'source', 'path', 'date'])
     return JSONResponse(posts)

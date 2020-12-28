@@ -15,6 +15,12 @@ ul {
   margin: 10px 0;
 }
 
+#post_link_container li span.date {
+  margin-left: 15px;
+  font-size: 12px;
+  text-align: left;
+}
+
 figure {
   width: 70%;
   margin: 0 auto;
@@ -29,4 +35,18 @@ figure video, figure img {
 figcaption {
   color: gray;
   text-align: center;
+}
+
+#search {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 60px;
+}
+
+.nav {
+  margin: 0 auto;
+}
+
+.nav > * {
+  margin: 0 15px;
 }

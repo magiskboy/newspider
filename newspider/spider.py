@@ -128,6 +128,7 @@ class DantriSpider(SpiderBase):
                     'date': self.get_date_from_soup(soup),
                     'content': self.get_content_from_soup(soup),
                     'tags': self.get_tags_from_soup(soup),
+                    'source': 'Dân trí',
                 }
             return page
 

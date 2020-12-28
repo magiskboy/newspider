@@ -13,7 +13,10 @@
 <div id="list__news">
   <ul id="post_link_container">
     {% for post in posts %}
-    <li><a href="/posts/{{ post['slug'] }}" target="_blank">{{ post['title'] }}</a></li>
+    <li>
+      <a href="{{post['path']}}" target="_blank">[{{post['source']}}]</a> <a href="/posts/{{ post['slug'] }}" target="_blank">{{ post['title'] }}</a>
+      <span class="date">{{ post['date'] }}</span>
+    </li>
     {% endfor %}
   </ul>
   <button onclick="loadMore(10)">Load more</button>
