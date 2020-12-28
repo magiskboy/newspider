@@ -1,5 +1,4 @@
 httpx
-rq
 starlette
 uvicorn
 jinja2

@@ -1,0 +1,35 @@
+version: "3.7"
+
+services:
+  web:
+    image: nguyenkhacthanh/newspider:latest
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - APP=web
+    ports:
+      - 8000:8000
+    depends_on:
+      - mongo
+    restart: on-failure
+    networks:
+      - mynet
+  clone:
+    image: nguyenkhacthanh/newspider:latest
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - APP=clone
+    command: ./venv/bin/python manager.py clone
+    depends_on:
+      - mongo
+    restart: on-failure
+    networks:
+      - mynet
+  mongo:
+    image: mongo:latest
+    expose:
+      - 27017
+    restart: on-failure
+    networks:
+      - mynet
+networks:
+  mynet:
