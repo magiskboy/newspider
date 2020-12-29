@@ -1,4 +1,5 @@
 import os
+import sys
 import typing as T
 import logging
 from pprint import pprint
@@ -12,7 +13,7 @@ import motor.motor_asyncio
 
 logger = logging.getLogger('newspider.spider')
 fmt = logging.Formatter('[%(asctime)-15s] %(message)s')
-handler = logging.StreamHandler()
+handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(fmt)
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
@@ -90,13 +91,15 @@ class DantriSpider(SpiderBase):
                 yield path
 
     def get_title_from_soup(self, soup):
+        title = None
         title_node = soup.select_one('.dt-news__title')
+
         if title_node:
-            title = title_node.get_text()
-            if title:
-                return title.strip()
-            return ''
-        return ''
+            title = (title_node.get_text() or '').strip()
+
+        if not title:
+            raise ValueError('Title not found')
+        return title
 
     def get_breadcrumb_from_soup(self, soup):
         nodes = soup.select('.dt-breadcrumb a')
@@ -121,10 +124,11 @@ class DantriSpider(SpiderBase):
 
     def get_content_from_soup(self, soup):
         content_node = soup.select_one('.dt-news__content')
-        return ''.join(str(x) for x in content_node.contents).strip()
+        if content_node:
+            return ''.join(str(x) for x in content_node.contents).strip()
+        raise ValueError('Content not found')
 
     async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
-        page = {}
         url = self.ROOT + path      #pylint: disable=E1101
         async with httpx.AsyncClient() as c:
             resp = await c.get(url)
@@ -133,7 +137,7 @@ class DantriSpider(SpiderBase):
                 soup = BeautifulSoup(resp.content, 'html.parser')
 
                 title = self.get_title_from_soup(soup)
-                page = {
+                return {
                     'title': title,
                     'slug': slugify(title),
                     'path': path,
@@ -143,7 +147,7 @@ class DantriSpider(SpiderBase):
                     'tags': self.get_tags_from_soup(soup),
                     'source': 'Dân trí',
                 }
-            return page
+            raise ValueError('Fetch page failure')
 
     async def fetch_and_save(self, path: str):
         page = await self.fetch_page(path)
@@ -162,7 +166,7 @@ class DantriSpider(SpiderBase):
             if exc is None:
                 self.page_success += 1
             else:
-                logger.error(exc.msg)
+                logger.error(exc)
 
 
 class VnxpressSpider(SpiderBase):
@@ -198,7 +202,7 @@ class VnxpressSpider(SpiderBase):
         title_node = soup.select_one('.title-detail')
         if title_node:
             return title_node.get_text().strip()
-        return ''
+        raise ValueError('Title not found')
 
     def get_breadcrumb_from_soup(self, soup):
         nodes = soup.select('ul.breadcrumb li a')
@@ -222,10 +226,9 @@ class VnxpressSpider(SpiderBase):
             data = ''.join(str(x) for x in content_node.contents).strip()
             data = data.replace('data-src', 'src')
             return data
-        return ''
+        raise ValueError('Content not found')
 
     async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
-        page = {}
         url = path      #pylint: disable=E1101
         async with httpx.AsyncClient() as c:
             resp = await c.get(url)
@@ -234,7 +237,7 @@ class VnxpressSpider(SpiderBase):
                 soup = BeautifulSoup(resp.text, 'html.parser')
 
                 title = self.get_title_from_soup(soup)
-                page = {
+                return {
                     'title': title,
                     'slug': slugify(title),
                     'path': path,
@@ -244,7 +247,7 @@ class VnxpressSpider(SpiderBase):
                     'tags': self.get_tags_from_soup(soup),
                     'source': 'VnExpress',
                 }
-            return page
+            raise ValueError('Fetch page failure')
 
     async def fetch_and_save(self, path: str):
         page = await self.fetch_page(path)
@@ -257,6 +260,7 @@ class VnxpressSpider(SpiderBase):
             fs.append(f)
 
         await asyncio.wait(fs)
+
         self.page_success = 0
         for f in fs:
             exc = f.exception()
@@ -264,12 +268,10 @@ class VnxpressSpider(SpiderBase):
                 self.page_success += 1
             else:
                 logger.error(exc)
-                raise exc
-
 
 
 def create_spider(name, *args, **kwargs):
     return {
-        'dantri': DantriSpider(*args, **kwargs),
-        'vnexpress': VnxpressSpider(*args, **kwargs),
-    }.get(name)
+        'dantri': DantriSpider,
+        'vnexpress': VnxpressSpider,
+    }.get(name)(*args, **kwargs)
