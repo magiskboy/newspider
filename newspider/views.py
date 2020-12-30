@@ -18,7 +18,7 @@ async def homepage(request: Request):
     context = {
         'request': request,
         'title': 'Homepage',
-        'posts': await get_posts(fields=['title', 'date', 'source', 'path', 'slug']),
+        'posts': await get_posts(fields=['title', 'date', 'source', 'url', 'slug']),
     }
 
     return templates.TemplateResponse(template, context)

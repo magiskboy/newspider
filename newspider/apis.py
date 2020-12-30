@@ -11,5 +11,5 @@ async def get_post_links(request: Request):
     page_size = request.query_params.get('page_size')
     page_size = utils.safe_cast(page_size, int, 10)
 
-    posts = await get_posts(None, page, page_size, fields=['title', 'slug', 'source', 'path', 'date'])
+    posts = await get_posts(None, page, page_size, fields=['title', 'slug', 'source', 'url', 'date'])
     return JSONResponse(posts)

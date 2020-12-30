@@ -5,7 +5,7 @@ var currentPage = 0;
 function renderPostItem(link) {
   li = document.createElement('li')
   src = document.createElement('a')
-  src.setAttribute('href', link['path'])
+  src.setAttribute('href', link['url'])
   src.setAttribute('target', '_blank')
   src.innerText = `[${link['source']}] `
   li.appendChild(src)

@@ -14,7 +14,7 @@ def post_to_dict(post, fields=None):
             'slug': post['slug'],
             'categories': post['categories'],
             'source': post['source'],
-            'path': post['path'],
+            'url': post['url'],
         }
     ret = {k: post[k] for k in fields}
     if 'date' in ret:

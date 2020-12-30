@@ -21,6 +21,7 @@ logger.setLevel(logging.INFO)
 
 class SpiderBase:
     ROOT: str
+    PROVIDER: str
 
     def __init__(self, mongo_uri):
         self.page_success = 0
@@ -32,12 +33,6 @@ class SpiderBase:
         self.db = self.mongo_client['newspider']
 
     async def get_list_post(self) -> T.Dict[str, str]:
-        raise NotImplementedError
-
-    async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
-        raise NotImplementedError
-
-    async def run(self):
         raise NotImplementedError
 
     def get_title_from_soup(self, soup) -> str:
@@ -58,9 +53,50 @@ class SpiderBase:
     async def save_to_storage(self, page):
         await self.db.posts.insert_one(page)
 
+    async def fetch_page(self, url: str) -> T.Dict[str, T.Any]:
+        async with httpx.AsyncClient() as c:
+            resp = await c.get(url)
+
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+
+                title = self.get_title_from_soup(soup)
+                return {
+                    'title': title,
+                    'slug': slugify(title),
+                    'url': url,
+                    'categories': self.get_breadcrumb_from_soup(soup),
+                    'date': self.get_date_from_soup(soup),
+                    'content': self.get_content_from_soup(soup),
+                    'tags': self.get_tags_from_soup(soup),
+                    'source': self.PROVIDER,
+                }
+            raise ValueError('Fetch page failure')
+
+    async def fetch_and_save(self, url: str):
+        page = await self.fetch_page(url)
+        await self.save_to_storage(page)
+
+    async def run(self):
+        fs = []
+        async for path in self.get_list_post():
+            f = asyncio.create_task(self.fetch_and_save(path))
+            fs.append(f)
+
+        await asyncio.wait(fs)
+
+        self.page_success = 0
+        for f in fs:
+            exc = f.exception()
+            if exc is None:
+                self.page_success += 1
+            else:
+                logger.error(exc)
+
 
 class DantriSpider(SpiderBase):
     ROOT = 'https://dantri.com.vn'
+    PROVIDER = 'Dân trí'
 
     def __init__(self, mongo_uri):
         super().__init__(mongo_uri)
@@ -87,8 +123,9 @@ class DantriSpider(SpiderBase):
                     continue
 
                 path = a[0].get('href')
+                url = self.ROOT + path      #pylint:disable=E1101
 
-                yield path
+                yield url
 
     def get_title_from_soup(self, soup):
         title = None
@@ -128,49 +165,10 @@ class DantriSpider(SpiderBase):
             return ''.join(str(x) for x in content_node.contents).strip()
         raise ValueError('Content not found')
 
-    async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
-        url = self.ROOT + path      #pylint: disable=E1101
-        async with httpx.AsyncClient() as c:
-            resp = await c.get(url)
-
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.content, 'html.parser')
-
-                title = self.get_title_from_soup(soup)
-                return {
-                    'title': title,
-                    'slug': slugify(title),
-                    'path': path,
-                    'categories': self.get_breadcrumb_from_soup(soup),
-                    'date': self.get_date_from_soup(soup),
-                    'content': self.get_content_from_soup(soup),
-                    'tags': self.get_tags_from_soup(soup),
-                    'source': 'Dân trí',
-                }
-            raise ValueError('Fetch page failure')
-
-    async def fetch_and_save(self, path: str):
-        page = await self.fetch_page(path)
-        await self.save_to_storage(page)
-
-    async def run(self):
-        fs = []
-        async for path in self.get_list_post():
-            f = asyncio.create_task(self.fetch_and_save(path))
-            fs.append(f)
-
-        await asyncio.wait(fs)
-        self.page_success = 0
-        for f in fs:
-            exc = f.exception()
-            if exc is None:
-                self.page_success += 1
-            else:
-                logger.error(exc)
-
 
 class VnxpressSpider(SpiderBase):
     ROOT = 'https://vnexpress.net'
+    PROVIDER = 'VnExpress'
 
     def __init__(self, mongo_uri):
         logger.info('VnexpressSpider is created')
@@ -228,46 +226,6 @@ class VnxpressSpider(SpiderBase):
             return data
         raise ValueError('Content not found')
 
-    async def fetch_page(self, path: str) -> T.Dict[str, T.Any]:
-        url = path      #pylint: disable=E1101
-        async with httpx.AsyncClient() as c:
-            resp = await c.get(url)
-
-            if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, 'html.parser')
-
-                title = self.get_title_from_soup(soup)
-                return {
-                    'title': title,
-                    'slug': slugify(title),
-                    'path': path,
-                    'categories': self.get_breadcrumb_from_soup(soup),
-                    'date': self.get_date_from_soup(soup),
-                    'content': self.get_content_from_soup(soup),
-                    'tags': self.get_tags_from_soup(soup),
-                    'source': 'VnExpress',
-                }
-            raise ValueError('Fetch page failure')
-
-    async def fetch_and_save(self, path: str):
-        page = await self.fetch_page(path)
-        await self.save_to_storage(page)
-
-    async def run(self):
-        fs = []
-        async for path in self.get_list_post():
-            f = asyncio.create_task(self.fetch_and_save(path))
-            fs.append(f)
-
-        await asyncio.wait(fs)
-
-        self.page_success = 0
-        for f in fs:
-            exc = f.exception()
-            if exc is None:
-                self.page_success += 1
-            else:
-                logger.error(exc)
 
 
 def create_spider(name, *args, **kwargs):
